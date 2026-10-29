@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+test-artifacts/
+.DS_Store
+*.log
+
+# 内部需求评估，不公开
+需求调研与评估.md
