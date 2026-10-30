@@ -919,6 +919,74 @@ try {
     check('其他文件类型预览', false, '未找到扩展 service worker')
   }
 
+  // 直接打开 file:// 非 Markdown 文件：接管成阅读器预览
+  {
+    const directPage = await ctx.newPage()
+    const directState = () =>
+      directPage.evaluate(() => {
+        const sr = document.getElementById('markdown-reader-host')?.shadowRoot
+        if (!sr) return { mounted: false }
+        const q = (s) => sr.querySelector(s)
+        const img = q('.mr-preview-image')
+        return {
+          mounted: true,
+          previewHidden: q('.mr-preview').hidden,
+          imageVisible: !q('.mr-image-wrap').hidden,
+          imageWidth: img?.naturalWidth ?? 0,
+          text: q('.mr-preview-text')?.textContent ?? '',
+          mediaCount: q('.mr-media-wrap')?.children.length ?? 0,
+          name: q('.mr-preview-name')?.textContent ?? '',
+          closeHidden: q('.mr-preview-close')?.hidden ?? false,
+          closeVisible: getComputedStyle(q('.mr-preview-close')).display !== 'none',
+          current: [...sr.querySelectorAll('.mr-node.is-current .mr-node-name')].map(
+            (n) => n.textContent,
+          ),
+          treeNames: [...sr.querySelectorAll('.mr-node-name')].map((n) => n.textContent),
+        }
+      })
+
+    await directPage.goto(pathToFileURL(resolve('test-artifacts/docs/pic.png')).href)
+    await directPage.waitForTimeout(1200)
+    const directImg = await directState()
+    check(
+      '直接打开 png 被接管',
+      directImg.mounted &&
+        !directImg.previewHidden &&
+        directImg.imageVisible &&
+        directImg.imageWidth === 64 &&
+        directImg.name === 'pic.png',
+      JSON.stringify(directImg),
+    )
+    check(
+      '直接打开的图片没有关闭按钮、仍列同目录文件',
+      !directImg.closeVisible && directImg.treeNames.includes('guide.md'),
+      JSON.stringify(directImg),
+    )
+
+    await directPage.goto(pathToFileURL(resolve('test-artifacts/docs/note.txt')).href)
+    await directPage.waitForTimeout(1200)
+    const directText = await directState()
+    check(
+      '直接打开 txt 被接管',
+      directText.mounted && !directText.previewHidden && directText.text.includes('第二行'),
+      JSON.stringify(directText),
+    )
+
+    await directPage.goto(pathToFileURL(resolve('test-artifacts/docs/tone.wav')).href)
+    await directPage.waitForTimeout(1200)
+    const directMedia = await directState()
+    check(
+      '直接打开 wav 被接管',
+      directMedia.mounted && directMedia.mediaCount === 1,
+      JSON.stringify(directMedia),
+    )
+
+    await directPage.goto(pathToFileURL(resolve('test-artifacts/docs/sample.html')).href)
+    await directPage.waitForTimeout(800)
+    check('直接打开 html 保持原生渲染', !(await directState()).mounted)
+    await directPage.close()
+  }
+
   // 面包屑 + 筛选
   const crumbs = await filePage.evaluate(() => {
     const sr = document.getElementById('markdown-reader-host').shadowRoot

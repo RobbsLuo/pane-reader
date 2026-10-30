@@ -1,9 +1,15 @@
 import { getSettings } from './shared/settings'
-import { mount } from './renderer/ui'
+import { mount, mountFile } from './renderer/ui'
 
 const MD_EXT = /\.(?:md|markdown|mkd|mdx)$/i
+const HTML_EXT = /\.(?:html?|xhtml)$/i
+/** 浏览器会当纯文本渲染的 application/* MIME */
+const TEXTUAL_APP =
+  /^application\/(?:json|ld\+json|json5|xml|yaml|x-yaml|toml|javascript|ecmascript|x-httpd-php|graphql|graphql-response\+json|sql)$/i
 const BOOTING_CLASS = 'mr-booting'
 const PREFLIGHT_ID = 'markdown-reader-preflight'
+
+type DirectKind = 'image' | 'media' | 'text'
 
 /** 被阅读器当作 iframe 嵌入的页面（如 HTML 预览）不接管，否则会无限嵌套 */
 function isFramed(): boolean {
@@ -20,6 +26,61 @@ function isMarkdownUrl(): boolean {
   } catch {
     return false
   }
+}
+
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url).pathname
+  } catch {
+    return ''
+  }
+}
+
+function fileName(): string {
+  const last = pathnameOf(location.href).split('/').filter(Boolean).pop()
+  if (!last) return '文件'
+  try {
+    return decodeURIComponent(last)
+  } catch {
+    return last
+  }
+}
+
+function isTextualMime(type: string): boolean {
+  if (!type) return false
+  if (type.startsWith('text/')) return !type.startsWith('text/markdown')
+  return TEXTUAL_APP.test(type)
+}
+
+/**
+ * 浏览器直接打开 file:///a.png 时，它自己渲染成 <img> / <video> / <pre>。
+ * 这里按 MIME 判断能否改成阅读器预览；PDF 交给浏览器内置阅读器（扩展读不到插件内容），
+ * HTML 保持原生渲染，不接管。
+ */
+function directKindFromMime(): DirectKind | null {
+  if (location.protocol !== 'file:') return null
+  if (isMarkdownDocument()) return null
+  if (HTML_EXT.test(pathnameOf(location.href))) return null
+
+  const type = (document.contentType || '').toLowerCase()
+  if (type === 'application/pdf' || type === 'application/xhtml+xml') return null
+  if (type.startsWith('image/')) return 'image'
+  if (type.startsWith('video/') || type.startsWith('audio/')) return 'media'
+  if (isTextualMime(type)) return 'text'
+  return null
+}
+
+/** MIME 不可靠时（少数本地文本文件），再看 DOM 结构兜底 */
+function directKind(): DirectKind | null {
+  const byMime = directKindFromMime()
+  if (byMime) return byMime
+  if (location.protocol !== 'file:') return null
+  if (isMarkdownDocument() || HTML_EXT.test(pathnameOf(location.href))) return null
+  const type = (document.contentType || '').toLowerCase()
+  if (type === 'application/pdf' || type.startsWith('image/') || type.startsWith('video/')) {
+    return null
+  }
+  return looksLikeRawText() ? 'text' : null
 }
 
 /** 浏览器是否把它当作可读文本展示（而不是 HTML 应用页） */
@@ -68,7 +129,9 @@ function bootTheme(): 'light' | 'dark' {
  * 渲染完成后再 reveal()，避免「裸文本一闪 → 重排」的闪动。
  */
 function preflight(): void {
-  if (isFramed() || !isMarkdownUrl() || document.getElementById(PREFLIGHT_ID)) return
+  if (isFramed() || document.getElementById(PREFLIGHT_ID)) return
+  // 直接打开的图片 / 音视频 / 纯文本同样先遮住浏览器原生视图
+  if (!isMarkdownUrl() && directKindFromMime() === null) return
 
   const theme = bootTheme()
   const background = theme === 'dark' ? '#0e1116' : '#ffffff'
@@ -115,6 +178,20 @@ async function main(): Promise<void> {
     reveal()
     return
   }
+  // 直接打开本地图片 / 音视频 / 纯文本：改成阅读器预览，而不是浏览器原生视图
+  const direct = directKind()
+  if (direct) {
+    const text = direct === 'text' ? (extractSource() ?? undefined) : undefined
+    try {
+      const settings = await getSettings()
+      mountFile(direct, fileName(), settings, text)
+      stripThemeHash()
+    } finally {
+      reveal()
+    }
+    return
+  }
+
   if (!isMarkdownDocument() || !looksLikeRawText()) {
     reveal()
     return

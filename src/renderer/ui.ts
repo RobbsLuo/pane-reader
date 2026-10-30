@@ -129,7 +129,12 @@ function normalizePath(url: string): string {
   }
 }
 
-export function mount(source: string, settings: Settings): void {
+export function mount(
+  source: string,
+  settings: Settings,
+  initial?: DirEntry,
+  initialText?: string,
+): void {
   if (mounted) return
   mounted = true
 
@@ -701,6 +706,8 @@ export function mount(source: string, settings: Settings): void {
 
   // ---- 文件目录树 ----
   let hasTree = false
+  // 直接打开 file:///a.png 这类非 Markdown 文件：预览就是页面本体，没有可返回的正文
+  const standalone = initial !== undefined
   let showFiles = settings.showFiles
   let current = settings
   let rawMode = false
@@ -845,6 +852,19 @@ export function mount(source: string, settings: Settings): void {
   })
 
   /** 文本预览：纯文本 / 代码 / JSON / CSV 等统一只读展示，JSON 顺手美化 */
+  function showPlainText(raw: string, name: string): void {
+    let text = raw
+    if (/\.jsonc?$|\.json5$/i.test(name)) {
+      try {
+        text = JSON.stringify(JSON.parse(text), null, 2)
+      } catch {
+        /* 非标准 JSON 就按原文展示 */
+      }
+    }
+    previewText.textContent = text
+    previewMeta.textContent = `${text.split('\n').length} 行 · ${formatBytes(new Blob([text]).size)}`
+  }
+
   async function loadPreviewText(target: URL, name: string): Promise<void> {
     const seq = ++previewSeq
     let text: string | null = null
@@ -864,15 +884,7 @@ export function mount(source: string, settings: Settings): void {
       previewMeta.textContent = ''
       return
     }
-    if (/\.jsonc?$|\.json5$/i.test(name)) {
-      try {
-        text = JSON.stringify(JSON.parse(text), null, 2)
-      } catch {
-        /* 非标准 JSON 就按原文展示 */
-      }
-    }
-    previewText.textContent = text
-    previewMeta.textContent = `${text.split('\n').length} 行 · ${formatBytes(new Blob([text]).size)}`
+    showPlainText(text, name)
   }
 
   function renderMedia(entry: DirEntry): void {
@@ -1458,16 +1470,45 @@ export function mount(source: string, settings: Settings): void {
       return
     }
     // 查找框打开时 Esc 先关查找框（由它自己的监听器处理）
-    if (previewUrl && findBar.hidden) closePreview()
+    if (!standalone && previewUrl && findBar.hidden) closePreview()
   })
 
   // ---- 接管页面 ----
   document.documentElement.style.overflow = 'hidden'
   document.body.replaceChildren(host)
 
+  if (initial) {
+    // 直接打开的非 Markdown 文件：进页面就展开预览，不经过文件树点击
+    if (standalone) {
+      previewClose.hidden = true
+      previewClose.style.display = 'none'
+      previewOpen.hidden = true
+      previewOpen.style.display = 'none'
+    }
+    openPreview(initial)
+    if (initial.kind === 'text' && typeof initialText === 'string') {
+      // 页面里已经有源码，省一次后台读取（也绕过 readText 的 5MB 上限）
+      previewSeq++
+      showPlainText(initialText, initial.name)
+    }
+  }
+
   void loadRoot(new URL('.', location.href).href)
 
   window.addEventListener('pagehide', () => {
     document.documentElement.style.overflow = originalOverflow
   })
+}
+
+/**
+ * 直接打开 file:// 的非 Markdown 文件（图片 / 音视频 / 纯文本）时接管页面，
+ * 复用文件树里的预览面板；text 传入页面里已读到的源码，避免再向后台要一次。
+ */
+export function mountFile(
+  kind: 'image' | 'media' | 'text',
+  name: string,
+  settings: Settings,
+  text?: string,
+): void {
+  mount('', settings, { name, url: location.href, type: 'file', kind }, text)
 }
