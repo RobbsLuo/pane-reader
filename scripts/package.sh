@@ -3,7 +3,7 @@
 set -euo pipefail
 
 VERSION=$(node -p "require('./package.json').version")
-OUT="release/markdown-reader-v${VERSION}.zip"
+OUT="release/pane-reader-v${VERSION}.zip"
 
 mkdir -p release
 rm -f "$OUT"

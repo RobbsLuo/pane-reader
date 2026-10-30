@@ -3,44 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Markdown Reader</title>
+    <title>Pane Reader</title>
   </head>
   <body>
     <div class="app">
       <header class="header">
-        <div class="logo" aria-hidden="true">M<span>↓</span></div>
+        <div class="logo" aria-hidden="true">pr</div>
         <div class="titles">
-          <h1>Markdown Reader</h1>
-          <p>本地与在线 Markdown 阅读</p>
+          <h1>Pane Reader</h1>
+          <p>浏览器里的本地文档阅读器</p>
         </div>
       </header>
 
-      <section class="section">
-        <div class="label">主题</div>
-        <div class="segmented" role="radiogroup" aria-label="主题">
-          <button type="button" data-theme="auto">跟随系统</button>
-          <button type="button" data-theme="light">亮色</button>
-          <button type="button" data-theme="dark">暗色</button>
-        </div>
-      </section>
+      <div class="sheet">
+        <section class="section">
+          <div class="label">主题</div>
+          <div class="segmented" role="radiogroup" aria-label="主题">
+            <button type="button" data-theme="auto">跟随系统</button>
+            <button type="button" data-theme="light">亮色</button>
+            <button type="button" data-theme="dark">暗色</button>
+          </div>
+        </section>
 
-      <section class="section">
-        <div class="label">
-          字号
-          <output id="size">16px</output>
-        </div>
-        <input id="fontSize" type="range" min="13" max="22" step="1" />
-      </section>
+        <section class="section">
+          <div class="label">
+            字号
+            <output id="size">16px</output>
+          </div>
+          <input id="fontSize" type="range" min="13" max="22" step="1" />
+        </section>
 
-      <section class="section">
-        <label class="row">
-          <span>显示右侧目录</span>
-          <input id="showToc" type="checkbox" />
-        </label>
-      </section>
+        <section class="section">
+          <label class="row">
+            <span>显示右侧目录</span>
+            <input id="showToc" type="checkbox" />
+          </label>
+        </section>
+
+        <section class="section">
+          <label class="row">
+            <span>文件树显示所有文件</span>
+            <input id="showOtherFiles" type="checkbox" />
+          </label>
+          <p class="hint">默认列出 Markdown、HTML、图片、PDF、文本等；关闭后只留 Markdown 和 HTML</p>
+        </section>
+      </div>
 
       <footer class="footer">
-        <span>零账号 · 零遥测 · 不联网</span>
+        <span>零账号 · 零遥测 · 不上传内容</span>
         <span id="version"></span>
       </footer>
     </div>

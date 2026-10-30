@@ -2,6 +2,17 @@ import { getSettings } from './shared/settings'
 import { mount } from './renderer/ui'
 
 const MD_EXT = /\.(?:md|markdown|mkd|mdx)$/i
+const BOOTING_CLASS = 'mr-booting'
+const PREFLIGHT_ID = 'markdown-reader-preflight'
+
+/** 被阅读器当作 iframe 嵌入的页面（如 HTML 预览）不接管，否则会无限嵌套 */
+function isFramed(): boolean {
+  try {
+    return window.top !== window.self
+  } catch {
+    return true
+  }
+}
 
 function isMarkdownUrl(): boolean {
   try {
@@ -45,16 +56,87 @@ function extractSource(): string | null {
   return null
 }
 
+/** 前一个页面跳转时写进 hash 的主题，用于首帧就铺对背景色 */
+function bootTheme(): 'light' | 'dark' {
+  const match = /[#&]mr-theme=(light|dark)/.exec(location.hash)
+  if (match) return match[1] as 'light' | 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+/**
+ * document_start 阶段立刻执行：先把背景铺成阅读色并隐藏原始 Markdown 文本，
+ * 渲染完成后再 reveal()，避免「裸文本一闪 → 重排」的闪动。
+ */
+function preflight(): void {
+  if (isFramed() || !isMarkdownUrl() || document.getElementById(PREFLIGHT_ID)) return
+
+  const theme = bootTheme()
+  const background = theme === 'dark' ? '#0e1116' : '#ffffff'
+
+  const style = document.createElement('style')
+  style.id = PREFLIGHT_ID
+  style.textContent = [
+    `html{background:${background};}`,
+    `html.${BOOTING_CLASS}{overflow:hidden;}`,
+    `html.${BOOTING_CLASS} body{opacity:0 !important;}`,
+  ].join('')
+  ;(document.head ?? document.documentElement).append(style)
+  document.documentElement.classList.add(BOOTING_CLASS)
+
+  // 兜底：脚本异常 / 长时间未渲染时不能让页面永远空白
+  window.setTimeout(reveal, 1500)
+}
+
+/** 渲染完成（或超时）后恢复显示 */
+function reveal(): void {
+  document.documentElement.classList.remove(BOOTING_CLASS)
+  document.getElementById(PREFLIGHT_ID)?.remove()
+}
+
+/** 清掉导航用的 #mr-theme，避免污染地址栏和页内锚点 */
+function stripThemeHash(): void {
+  if (!location.hash.includes('mr-theme=')) return
+  const rest = location.hash
+    .replace(/^#/, '')
+    .split('&')
+    .filter((part) => part && !part.startsWith('mr-theme='))
+    .join('&')
+  try {
+    history.replaceState(null, '', `${location.pathname}${location.search}${rest ? `#${rest}` : ''}`)
+  } catch {
+    /* file:// 等场景可能禁止修改 history */
+  }
+}
+
 async function main(): Promise<void> {
-  if (document.getElementById('markdown-reader-host')) return
-  if (!isMarkdownDocument() || !looksLikeRawText()) return
+  // iframe 里的页面（HTML 预览）交还给浏览器原生渲染
+  if (isFramed()) return
+  if (document.getElementById('markdown-reader-host')) {
+    reveal()
+    return
+  }
+  if (!isMarkdownDocument() || !looksLikeRawText()) {
+    reveal()
+    return
+  }
 
   const source = extractSource()
-  if (!source) return
+  if (!source) {
+    reveal()
+    return
+  }
 
-  const settings = await getSettings()
-  mount(source, settings)
+  try {
+    const settings = await getSettings()
+    mount(source, settings)
+    stripThemeHash()
+  } finally {
+    reveal()
+  }
 }
+
+// document_start 就要抢在浏览器绘制原始文本之前
+preflight()
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => void main(), { once: true })

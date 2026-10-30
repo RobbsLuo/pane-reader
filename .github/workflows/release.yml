@@ -26,10 +26,10 @@ jobs:
       - name: Package extension
         run: |
           cd dist
-          zip -qr "../markdown-reader-${GITHUB_REF_NAME}.zip" .
+          zip -qr "../pane-reader-${GITHUB_REF_NAME}.zip" .
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: markdown-reader-${{ github.ref_name }}.zip
+          files: pane-reader-${{ github.ref_name }}.zip
           generate_release_notes: true

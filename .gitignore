@@ -1,9 +1,48 @@
+# ---------- 依赖 ----------
 node_modules/
-dist/
-release/
-test-artifacts/
-.DS_Store
-*.log
+.pnpm-store/
 
-# 内部需求评估，不公开
-需求调研与评估.md
+# ---------- 构建产物 ----------
+dist/
+.vite/
+*.tsbuildinfo
+
+# ---------- 打包产物 ----------
+# 本地 npm run package 输出到 release/，CI 直接打在仓库根目录
+release/
+/pane-reader-*.zip
+
+# ---------- 测试与截图产物 ----------
+# smoke.mjs 每次运行都会重写这些夹具和截图
+test-artifacts/
+test-results/
+playwright-report/
+coverage/
+
+# ---------- 环境与本地配置 ----------
+.env
+.env.*
+!.env.example
+*.local
+
+# ---------- 编辑器 ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- 操作系统 ----------
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+# ---------- 日志与缓存 ----------
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.cache/

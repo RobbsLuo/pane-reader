@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Markdown Reader",
-  "version": "0.3.0",
-  "description": "隐私优先的 Markdown 阅读器：本地与在线 .md 直接渲染，左侧文件树、右侧大纲。",
+  "name": "Pane Reader",
+  "version": "0.3.1",
+  "description": "隐私优先的本地文档阅读器：Markdown、HTML、图片、PDF 直接打开，左侧文件树、右侧大纲。",
   "permissions": [
     "storage"
   ],
@@ -26,12 +26,12 @@
       "js": [
         "content.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Markdown Reader",
+    "default_title": "Pane Reader",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

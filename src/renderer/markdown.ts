@@ -102,6 +102,22 @@ export function createMarkdown() {
       : self.renderToken(tokens, idx, options)
   }
 
+  // 表格：包一层滚动容器，CSS 才能既撑满栏宽又支持横向滚动
+  const defaultTableOpen = md.renderer.rules.table_open
+  md.renderer.rules.table_open = (tokens, idx, options, env, self) =>
+    `<div class="mr-table">${
+      defaultTableOpen
+        ? defaultTableOpen(tokens, idx, options, env, self)
+        : self.renderToken(tokens, idx, options)
+    }`
+  const defaultTableClose = md.renderer.rules.table_close
+  md.renderer.rules.table_close = (tokens, idx, options, env, self) =>
+    `${
+      defaultTableClose
+        ? defaultTableClose(tokens, idx, options, env, self)
+        : self.renderToken(tokens, idx, options)
+    }</div>`
+
   // 图片：解析相对路径 + 懒加载
   const defaultImage = md.renderer.rules.image!
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
@@ -128,6 +144,41 @@ export function createMarkdown() {
     return defaultLinkOpen(tokens, idx, options, env, self)
   }
 
+  // GitHub 提示块：> [!NOTE] / TIP / IMPORTANT / WARNING / CAUTION
+  // markdown-it 没有内置支持，这里在 token 层把标记摘掉并给 blockquote 打类型
+  const alerts = new Set(['note', 'tip', 'important', 'warning', 'caution'])
+  md.core.ruler.push('github_alerts', (state) => {
+    const tokens = state.tokens
+    for (let i = 0; i < tokens.length; i += 1) {
+      if (tokens[i].type !== 'blockquote_open') continue
+      let depth = 0
+      for (let j = i + 1; j < tokens.length; j += 1) {
+        if (tokens[j].type === 'blockquote_open') depth += 1
+        else if (tokens[j].type === 'blockquote_close') {
+          if (depth === 0) break
+          depth -= 1
+        } else if (tokens[j].type === 'inline' && depth === 0) {
+          const text = tokens[j].content
+          const match = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:\r?\n)?/i.exec(text)
+          if (!match) break
+          const kind = match[1].toLowerCase()
+          if (!alerts.has(kind)) break
+          tokens[j].content = text.slice(match[0].length)
+          const first = tokens[j].children?.[0]
+          if (first && first.type === 'text') {
+            first.content = first.content.replace(
+              /^\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*\r?\n?/i,
+              '',
+            )
+          }
+          tokens[i].attrJoin('class', `mr-alert mr-alert-${kind}`)
+          tokens[i].attrSet('data-alert', kind)
+          break
+        }
+      }
+    }
+  })
+
   return md
 }
 
@@ -148,6 +199,37 @@ export function highlightCode(code: string, lang: string | undefined): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+export interface FrontMatterEntry {
+  key: string
+  value: string
+}
+
+/**
+ * 拆出 YAML front matter。只做阅读场景需要的那一层：顶层 `key: value`，
+ * 解析不出的行按原样保留，不引第三方 YAML 解析器。
+ */
+export function splitFrontMatter(source: string): {
+  body: string
+  entries: FrontMatterEntry[]
+} {
+  const match = /^---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/.exec(source)
+  if (!match) return { body: source, entries: [] }
+
+  const entries: FrontMatterEntry[] = []
+  for (const line of match[1].split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const pair = /^([^:]+):[ \t]*(.*)$/.exec(trimmed)
+    if (!pair) {
+      entries.push({ key: '', value: trimmed })
+      continue
+    }
+    const value = pair[2].replace(/^["']|["']$/g, '').trim()
+    if (value) entries.push({ key: pair[1].trim(), value })
+  }
+  return { body: source.slice(match[0].length), entries }
 }
 
 export function renderMarkdown(source: string): string {

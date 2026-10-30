@@ -7,6 +7,7 @@ const themeButtons = Array.from(
 const sizeInput = document.querySelector<HTMLInputElement>('#fontSize')!
 const sizeOutput = document.querySelector<HTMLOutputElement>('#size')!
 const tocInput = document.querySelector<HTMLInputElement>('#showToc')!
+const otherFilesInput = document.querySelector<HTMLInputElement>('#showOtherFiles')!
 
 function paint(settings: Settings): void {
   for (const button of themeButtons) {
@@ -18,6 +19,7 @@ function paint(settings: Settings): void {
   sizeInput.value = String(settings.fontSize)
   sizeOutput.value = `${settings.fontSize}px`
   tocInput.checked = settings.showToc
+  otherFilesInput.checked = settings.showOtherFiles
 }
 
 async function init(): Promise<void> {
@@ -40,6 +42,10 @@ async function init(): Promise<void> {
 
   tocInput.addEventListener('change', async () => {
     paint(await saveSettings({ showToc: tocInput.checked }))
+  })
+
+  otherFilesInput.addEventListener('change', async () => {
+    paint(await saveSettings({ showOtherFiles: otherFilesInput.checked }))
   })
 
   try {

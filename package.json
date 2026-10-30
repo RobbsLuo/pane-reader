@@ -1,7 +1,7 @@
 {
-  "name": "markdown-reader",
-  "version": "0.3.0",
-  "description": "A privacy-first Markdown reader extension for Chrome/Edge",
+  "name": "pane-reader",
+  "version": "0.3.1",
+  "description": "A privacy-first local document reader extension for Chrome/Edge",
   "main": "index.js",
   "scripts": {
     "test": "node scripts/smoke.mjs",
