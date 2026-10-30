@@ -1228,7 +1228,7 @@ try {
   })
   check(
     '展开手柄箭头朝面板方向',
-    railArrows.left === 'M9 5l7 7-7 7' && railArrows.right === 'M15 5l-7 7 7 7',
+    railArrows.left === 'm9 18 6-6-6-6' && railArrows.right === 'm15 18-6-6 6-6',
     JSON.stringify(railArrows),
   )
 

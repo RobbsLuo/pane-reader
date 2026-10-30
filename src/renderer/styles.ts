@@ -24,6 +24,15 @@ export const readerCss = /* css */ `
   --mr-quote-bg: transparent;
   --mr-mark-bg: color-mix(in srgb, #1b6c80 18%, transparent);
   --mr-shadow: 0 18px 40px -26px rgba(18, 20, 20, 0.42);
+  --mr-files-w: 264px;
+  /* 文件树类型图标：色相区分类型，明度压住不抢正文 */
+  --mr-kind-dir: #a8752a;
+  --mr-kind-md: #1b6c80;
+  --mr-kind-html: #c2621b;
+  --mr-kind-image: #2b8a5f;
+  --mr-kind-pdf: #cc3d3d;
+  --mr-kind-text: #6d5bd0;
+  --mr-kind-media: #c2457f;
   --mr-font-size: 16px;
   --mr-bar-h: 48px;
   --mr-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
@@ -59,6 +68,14 @@ export const readerCss = /* css */ `
   --mr-quote-bg: transparent;
   --mr-mark-bg: color-mix(in srgb, #6fc0d0 24%, transparent);
   --mr-shadow: 0 18px 40px -26px rgba(0, 0, 0, 0.7);
+  /* 暗色下整体提亮，保住同样的类型区分度 */
+  --mr-kind-dir: #d9a85f;
+  --mr-kind-md: #8fd0dd;
+  --mr-kind-html: #f09a5c;
+  --mr-kind-image: #6fd39a;
+  --mr-kind-pdf: #ff8b8b;
+  --mr-kind-text: #b3a4ff;
+  --mr-kind-media: #f28fbb;
 }
 
 .mr-root *,
@@ -77,7 +94,7 @@ export const readerCss = /* css */ `
 /* 三列：左文件树 / 白纸正文 / 右目录。正文吃掉两侧栏以外的全部宽度 */
 .mr-layout {
   display: grid;
-  grid-template-columns: 208px minmax(0, 1fr) 192px;
+  grid-template-columns: var(--mr-files-w) minmax(0, 1fr) 192px;
   align-items: start;
   gap: 32px;
   max-width: none;
@@ -318,7 +335,7 @@ audio.mr-media {
 @media (min-width: 1001px) {
   /* 右侧目录收起后，正文吃掉腾出的右列 */
   .mr-layout:has(.mr-toc[hidden]) {
-    grid-template-columns: 208px minmax(0, 1fr);
+    grid-template-columns: var(--mr-files-w) minmax(0, 1fr);
   }
 
   /* 两侧都收起 → 单列满宽 */
@@ -1106,7 +1123,7 @@ audio.mr-media {
   grid-column: 1;
   justify-self: start;
   align-self: start;
-  width: 208px;
+  width: var(--mr-files-w);
   max-height: calc(100vh - var(--mr-bar-h) - 36px);
   padding-bottom: 24px;
   overflow-x: hidden;
@@ -1374,27 +1391,52 @@ audio.mr-media {
 
 .mr-icon {
   display: inline-flex;
-  flex: 0 0 14px;
-  color: var(--mr-muted);
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--mr-icon-color, var(--mr-muted));
 }
 
 .mr-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-/* 文件类型图标一律跟随文字颜色，颜色只留给选中态 */
+/* 按文件类型上色：形状之外再给一层色相，扫一眼就能分开 */
 .mr-node[data-type='dir'] > .mr-node-row .mr-icon {
-  color: var(--mr-muted);
+  --mr-icon-color: var(--mr-kind-dir);
 }
 
-.mr-node.is-current > .mr-node-row .mr-icon {
-  color: var(--mr-accent);
+/* Markdown 没有 data-kind，用「无 kind 的文件」兜底 */
+.mr-node[data-type='file'] > .mr-node-row .mr-icon:not([data-kind]) {
+  --mr-icon-color: var(--mr-kind-md);
+}
+
+.mr-icon[data-kind='html'] {
+  --mr-icon-color: var(--mr-kind-html);
+}
+
+.mr-icon[data-kind='image'] {
+  --mr-icon-color: var(--mr-kind-image);
+}
+
+.mr-icon[data-kind='pdf'] {
+  --mr-icon-color: var(--mr-kind-pdf);
+}
+
+.mr-icon[data-kind='text'] {
+  --mr-icon-color: var(--mr-kind-text);
+}
+
+.mr-icon[data-kind='media'] {
+  --mr-icon-color: var(--mr-kind-media);
 }
 
 .mr-node-empty {
@@ -1476,12 +1518,12 @@ audio.mr-media {
 /* 三栏放不下时收起目录，正文保持可读行长 */
 @media (max-width: 1180px) {
   .mr-layout {
-    grid-template-columns: 208px minmax(0, 1fr);
+    grid-template-columns: var(--mr-files-w) minmax(0, 1fr);
     gap: 28px;
   }
 
   .mr-sidebar {
-    width: 208px;
+    width: var(--mr-files-w);
   }
 
   .mr-toc {
@@ -1530,7 +1572,7 @@ audio.mr-media {
     top: 0;
     left: 0;
     z-index: 12;
-    width: min(78vw, 280px);
+    width: min(80vw, 320px);
     /* 固定定位在网格子项里不会自动撑满，显式给高 */
     height: 100vh;
     height: 100dvh;

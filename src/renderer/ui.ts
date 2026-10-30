@@ -1,4 +1,19 @@
 import DOMPurify from 'dompurify'
+import chevronLeftIcon from 'lucide-static/icons/chevron-left.svg?raw'
+import chevronRightIcon from 'lucide-static/icons/chevron-right.svg?raw'
+import codeXmlIcon from 'lucide-static/icons/code-xml.svg?raw'
+import fileAudioIcon from 'lucide-static/icons/file-audio.svg?raw'
+import fileBracesIcon from 'lucide-static/icons/file-braces.svg?raw'
+import fileCodeIcon from 'lucide-static/icons/file-code.svg?raw'
+import fileIcon from 'lucide-static/icons/file.svg?raw'
+import fileImageIcon from 'lucide-static/icons/file-image.svg?raw'
+import fileTextIcon from 'lucide-static/icons/file-text.svg?raw'
+import fileTypeIcon from 'lucide-static/icons/file-type.svg?raw'
+import fileVideoIcon from 'lucide-static/icons/file-video.svg?raw'
+import folderIcon from 'lucide-static/icons/folder.svg?raw'
+import folderTreeIcon from 'lucide-static/icons/folder-tree.svg?raw'
+import listTreeIcon from 'lucide-static/icons/list-tree.svg?raw'
+import sunMoonIcon from 'lucide-static/icons/sun-moon.svg?raw'
 import katexCss from 'katex/dist/katex.min.css?inline'
 import hljsLightCss from 'highlight.js/styles/github.css?inline'
 import hljsDarkCss from 'highlight.js/styles/github-dark.css?inline'
@@ -96,27 +111,31 @@ function htmlSandbox(url: string): string {
   }
 }
 
+// 图标来自 lucide-static（ISC）：统一 24 网格、2px 描边，颜色全部走 currentColor。
+// ?raw 只打进实际用到的十几个文件，不会拖入整包。
+/** 去掉许可证注释，补上无障碍属性；尺寸和描边宽度由 CSS 决定 */
+function icon(raw: string): string {
+  return raw
+    .replace(/^<!--[\s\S]*?-->\s*/, '')
+    .replace('<svg', '<svg aria-hidden="true" focusable="false"')
+}
+
 const ICONS = {
-  files:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
-  toc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13"/></svg>',
-  theme:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
-  raw: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg>',
-  chevronLeft:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
-  chevronRight:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
-  folder:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
-  file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>',
-  html: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M10 13.5 8.5 15l1.5 1.5M14 13.5 15.5 15 14 16.5"/></svg>',
-  image:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><circle cx="10" cy="12" r="1.3"/><path d="M7 19l3.5-3.5 2 2L15 15l3 3"/></svg>',
-  pdf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h1.5a1.5 1.5 0 0 1 0 3H9zm0 6v-3M13 18v-6h1.5a1.5 1.5 0 0 1 0 3H13"/></svg>',
-  text: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 15.5h6M9 19h4"/></svg>',
-  media:
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9.5l4.5 2.5L10 14.5z"/></svg>',
+  files: icon(folderTreeIcon),
+  toc: icon(listTreeIcon),
+  theme: icon(sunMoonIcon),
+  raw: icon(codeXmlIcon),
+  chevronLeft: icon(chevronLeftIcon),
+  chevronRight: icon(chevronRightIcon),
+  folder: icon(folderIcon),
+  file: icon(fileIcon),
+  md: icon(fileTextIcon),
+  html: icon(fileCodeIcon),
+  image: icon(fileImageIcon),
+  pdf: icon(fileTypeIcon),
+  text: icon(fileBracesIcon),
+  media: icon(fileVideoIcon),
+  audio: icon(fileAudioIcon),
 }
 
 let mounted = false
@@ -729,9 +748,13 @@ export function mount(
       case 'pdf':
         return ICONS.pdf
       case 'media':
-        return ICONS.media
+        return /\.(?:mp3|wav|ogg|oga|m4a|aac|flac)$/i.test(entry.name)
+          ? ICONS.audio
+          : ICONS.media
       case 'text':
         return ICONS.text
+      case 'md':
+        return ICONS.md
       default:
         return ICONS.file
     }
@@ -1025,8 +1048,7 @@ export function mount(
         const caret = document.createElement('button')
         caret.type = 'button'
         caret.className = 'mr-caret'
-        caret.innerHTML =
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>'
+        caret.innerHTML = ICONS.chevronRight
         caret.setAttribute('aria-label', '展开')
         row.append(caret)
       } else {
