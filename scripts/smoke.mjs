@@ -567,21 +567,33 @@ try {
     JSON.stringify(localTree),
   )
 
-  // 3.8 切换文件：不残留 booting 遮罩，主题 hash 被清掉
-  const guideUrl = pathToFileURL(resolve('test-artifacts/docs/guide.md')).href
-  await filePage.evaluate((url) => {
+  // 3.8 树里切换 md：原地换正文，不整页刷新
+  await filePage.evaluate(() => {
+    window.__mrProbe = 'kept'
     const sr = document.getElementById('markdown-reader-host').shadowRoot
-    const link = Array.from(sr.querySelectorAll('.mr-tree .mr-node-name')).find(
-      (n) => n.textContent === 'guide.md',
-    )
-    link.click()
-  }, guideUrl)
-  await filePage.waitForURL(/guide\.md/, { timeout: 10_000 })
-  await inspect(filePage)
+    Array.from(sr.querySelectorAll('.mr-tree .mr-node-name'))
+      .find((n) => n.textContent === 'guide.md')
+      ?.click()
+  })
+  await filePage.waitForFunction(
+    () => {
+      const sr = document.getElementById('markdown-reader-host')?.shadowRoot
+      return sr?.querySelector('.mr-article h1')?.textContent?.trim() === 'Guide'
+    },
+    { timeout: 10_000 },
+  )
   const switched = await filePage.evaluate(() => {
     const sr = document.getElementById('markdown-reader-host').shadowRoot
     return {
       h1: sr.querySelector('.mr-article h1')?.textContent?.trim() ?? '',
+      probe: window.__mrProbe,
+      url: location.href,
+      name: sr.querySelector('.mr-toolbar-doc')?.textContent ?? '',
+      current: Array.from(sr.querySelectorAll('.mr-tree .mr-node.is-current .mr-node-name')).map(
+        (n) => n.textContent,
+      ),
+      sidebar: !sr.querySelector('.mr-sidebar').hidden,
+      source: sr.querySelector('.mr-source').textContent ?? '',
       booting: document.documentElement.classList.contains('mr-booting'),
       preflight: !!document.getElementById('markdown-reader-preflight'),
       hash: location.hash,
@@ -589,18 +601,39 @@ try {
     }
   })
   check(
-    '文件切换无残留遮罩',
-    switched.h1 === 'Guide' && !switched.booting && !switched.preflight && !switched.leaving && switched.hash === '',
+    '切换 md 原地渲染不刷新',
+    switched.h1 === 'Guide' &&
+      switched.probe === 'kept' &&
+      switched.url.endsWith('/index.md') &&
+      switched.name === 'guide.md' &&
+      switched.current.length === 1 &&
+      switched.current[0] === 'guide.md' &&
+      switched.sidebar &&
+      switched.source.includes('第一篇') &&
+      !switched.booting &&
+      !switched.preflight &&
+      !switched.leaving &&
+      switched.hash === '',
     JSON.stringify(switched),
   )
 
-  // 回到 index.md，后续断言依赖它的内容
-  await filePage.goto(fileUrl)
-  await inspect(filePage)
-  await filePage.waitForFunction(() => {
-    const sr = document.getElementById('markdown-reader-host')?.shadowRoot
-    return sr && !sr.querySelector('.mr-sidebar').hidden
-  }, { timeout: 15_000 })
+  // 点回 index.md，后续断言依赖它的内容
+  await filePage.evaluate(() => {
+    const sr = document.getElementById('markdown-reader-host').shadowRoot
+    Array.from(sr.querySelectorAll('.mr-tree .mr-node-name'))
+      .find((n) => n.textContent === 'index.md')
+      ?.click()
+  })
+  await filePage.waitForFunction(
+    () => {
+      const sr = document.getElementById('markdown-reader-host')?.shadowRoot
+      return (
+        sr?.querySelector('.mr-article h1')?.textContent?.includes('冒烟测试') === true &&
+        !sr.querySelector('.mr-sidebar').hidden
+      )
+    },
+    { timeout: 10_000 },
+  )
 
   // 展开子目录
   await filePage.evaluate(() => {

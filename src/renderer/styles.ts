@@ -84,12 +84,6 @@ export const readerCss = /* css */ `
   box-sizing: border-box;
 }
 
-/* 切换文件时淡出，掩盖整页导航的重绘 */
-.mr-root.is-leaving {
-  opacity: 0;
-  transition: opacity 90ms ease-out;
-}
-
 /* ---------- 布局 ---------- */
 /* 三列：左文件树 / 白纸正文 / 右目录。正文吃掉两侧栏以外的全部宽度 */
 .mr-layout {

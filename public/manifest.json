@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pane Reader",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "隐私优先的本地文档阅读器：Markdown、HTML、图片、PDF 直接打开，左侧文件树、右侧大纲。",
   "permissions": [
     "storage"

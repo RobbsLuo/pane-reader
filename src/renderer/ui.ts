@@ -62,14 +62,14 @@ const SCROLL_TTL = 30 * 24 * 60 * 60 * 1000
 
 type ScrollMap = Record<string, { top: number; at: number }>
 
-function pageKey(): string {
+function pageKey(href = location.href): string {
   try {
-    const url = new URL(location.href)
+    const url = new URL(href)
     url.hash = ''
     url.search = ''
     return url.href
   } catch {
-    return location.href
+    return href
   }
 }
 
@@ -298,34 +298,66 @@ export function mount(
   const findCount = findBar.querySelector<HTMLElement>('.mr-find-count')!
 
   // ---- 渲染 ----
-  const { body, entries } = splitFrontMatter(source)
-  const sanitized = DOMPurify.sanitize(renderMarkdown(body), {
-    USE_PROFILES: { html: true, mathMl: true, svg: true, svgFilters: true },
-    ADD_ATTR: ['target', 'loading', 'decoding', 'align'],
-    ALLOWED_URI_REGEXP: SAFE_URI,
-  })
-  article.innerHTML = sanitized
-  if (entries.length > 0) article.prepend(buildMetaPanel(entries))
-  observeHighlight()
-  observeMermaid()
+  let activeTheme: 'light' | 'dark' = 'light'
+  let docSource = source
+  let docUrl = new URL(location.href)
+  let headings: HTMLElement[] = []
+  let tocLinks: HTMLAnchorElement[] = []
+  // 文章在 shadow DOM 里，document.getElementById 查不到，必须走本地映射
+  const headingById = new Map<string, HTMLElement>()
 
-  // 代码块复制按钮
-  for (const pre of article.querySelectorAll('pre')) {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'mr-copy'
-    button.textContent = '复制'
-    button.addEventListener('click', async () => {
-      const text = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
-      try {
-        await navigator.clipboard.writeText(text)
-        button.textContent = '已复制'
-      } catch {
-        button.textContent = '复制失败'
-      }
-      setTimeout(() => (button.textContent = '复制'), 1200)
+  /** 渲染一篇 Markdown（首屏与树里切换共用，不整页刷新） */
+  function renderArticle(text: string): void {
+    const { body, entries } = splitFrontMatter(text)
+    const sanitized = DOMPurify.sanitize(renderMarkdown(body), {
+      USE_PROFILES: { html: true, mathMl: true, svg: true, svgFilters: true },
+      ADD_ATTR: ['target', 'loading', 'decoding', 'align'],
+      ALLOWED_URI_REGEXP: SAFE_URI,
     })
-    pre.append(button)
+    article.innerHTML = sanitized
+    if (entries.length > 0) article.prepend(buildMetaPanel(entries))
+    observeHighlight()
+    observeMermaid()
+
+    // 代码块复制按钮
+    for (const pre of article.querySelectorAll('pre')) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'mr-copy'
+      button.textContent = '复制'
+      button.addEventListener('click', async () => {
+        const code = pre.querySelector('code')?.textContent ?? pre.textContent ?? ''
+        try {
+          await navigator.clipboard.writeText(code)
+          button.textContent = '已复制'
+        } catch {
+          button.textContent = '复制失败'
+        }
+        setTimeout(() => (button.textContent = '复制'), 1200)
+      })
+      pre.append(button)
+    }
+
+    headings = Array.from(
+      article.querySelectorAll<HTMLElement>('h1, h2, h3, h4'),
+    ).filter((el) => el.id && (el.textContent ?? '').trim())
+
+    // 长文档标题可能上千个：用片段批量插入 + 事件委托，避免逐个绑定监听器
+    const tocFragment = document.createDocumentFragment()
+    for (const heading of headings) {
+      const link = document.createElement('a')
+      link.href = `#${heading.id}`
+      link.textContent = heading.textContent!.trim()
+      link.dataset.level = heading.tagName.slice(1)
+      link.dataset.target = heading.id
+      tocFragment.append(link)
+    }
+    tocNav.replaceChildren(tocFragment)
+    tocLinks = Array.from(tocNav.querySelectorAll<HTMLAnchorElement>('a'))
+
+    headingById.clear()
+    for (const heading of headings) headingById.set(heading.id, heading)
+    requestAnimationFrame(syncActive)
   }
 
   // 图片灯箱
@@ -340,27 +372,6 @@ export function mount(
     lightbox.hidden = true
     lightboxImg.src = ''
   })
-
-  // ---- 目录 ----
-  const headings = Array.from(
-    article.querySelectorAll<HTMLElement>('h1, h2, h3, h4'),
-  ).filter((el) => el.id && (el.textContent ?? '').trim())
-
-  // 长文档标题可能上千个：用片段批量插入 + 事件委托，避免逐个绑定监听器
-  const tocFragment = document.createDocumentFragment()
-  for (const heading of headings) {
-    const link = document.createElement('a')
-    link.href = `#${heading.id}`
-    link.textContent = heading.textContent!.trim()
-    link.dataset.level = heading.tagName.slice(1)
-    link.dataset.target = heading.id
-    tocFragment.append(link)
-  }
-  tocNav.append(tocFragment)
-
-  // 文章在 shadow DOM 里，document.getElementById 查不到，必须走本地映射
-  const headingById = new Map<string, HTMLElement>()
-  for (const heading of headings) headingById.set(heading.id, heading)
 
   // 滚动容器是 fixed 的 host（不是 window），按 56px 顶部留白手动对齐
   const scrollToHeading = (heading: HTMLElement): void => {
@@ -383,8 +394,7 @@ export function mount(
     }
   })
 
-  const tocLinks = Array.from(tocNav.querySelectorAll<HTMLAnchorElement>('a'))
-  const syncActive = () => {
+  const syncActive = (): void => {
     const top = 96
     let activeIndex = 0
     headings.forEach((heading, index) => {
@@ -412,10 +422,11 @@ export function mount(
     },
     { passive: true },
   )
+
+  renderArticle(docSource)
   requestAnimationFrame(() => requestAnimationFrame(syncActive))
 
   // ---- Mermaid ----
-  let activeTheme: 'light' | 'dark' = 'light'
   let mermaidFrame: HTMLIFrameElement | null = null
   let mermaidFrameReady: Promise<HTMLIFrameElement> | null = null
   const mermaidPending = new Map<
@@ -760,9 +771,9 @@ export function mount(
     }
   }
 
-  /** 当前项高亮：预览时跟随被预览的文件，而不是地址栏 */
+  /** 当前项高亮：预览 / 原地切换时跟随目标文件，而不是地址栏 */
   function markCurrent(): void {
-    const here = normalizePath(previewUrl?.href ?? location.href)
+    const here = normalizePath(previewUrl?.href ?? docUrl.href)
     for (const node of tree.querySelectorAll<HTMLElement>('.mr-node[data-type="file"]')) {
       const link = node.querySelector<HTMLAnchorElement>(':scope > .mr-node-row .mr-node-name')
       if (!link) continue
@@ -1005,7 +1016,7 @@ export function mount(
     previewImageWrap.hidden = true
     previewText.hidden = true
     previewMedia.hidden = true
-    sourceView.textContent = source
+    sourceView.textContent = docSource
     rawMode = false
     rawButton.setAttribute('aria-pressed', 'false')
     markCurrent()
@@ -1019,6 +1030,56 @@ export function mount(
     previewText.classList.toggle('is-wrap', wrapped)
     previewWrap.setAttribute('aria-pressed', String(wrapped))
   })
+
+  let markdownSeq = 0
+
+  /** 文件树里点 Markdown：读完原文就在本页换正文，不整页刷新 */
+  async function openMarkdown(entry: DirEntry): Promise<void> {
+    const seq = ++markdownSeq
+    let text: string | null = null
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'mr:readText',
+        url: entry.url,
+      })
+      text = response?.ok ? String(response.text ?? '') : null
+    } catch {
+      text = null
+    }
+    if (seq !== markdownSeq) return
+    // 读不到就退回浏览器直接打开，至少还能看
+    if (text === null) {
+      window.open(entry.url, '_blank', 'noopener')
+      return
+    }
+
+    // 先把上一篇的阅读位置落盘，再换正文
+    if (!previewUrl) flushScroll()
+
+    docSource = text
+    docUrl = new URL(entry.url)
+    previewUrl = null
+    previewKind = null
+    previewLoading = null
+    resetStage()
+    toolbarDoc.textContent = entry.name
+    toolbarDoc.title = entry.name
+    // 源码视图始终对应当前这篇
+    sourceView.textContent = text
+    renderArticle(text)
+    closeFind()
+    markCurrent()
+    apply(current)
+    host.scrollTop = 0
+    restoreScroll(docUrl.href)
+
+    try {
+      // 地址栏跟着换，刷新后停在同一篇；file:// 下可能被拒，忽略即可
+      history.replaceState(null, '', entry.url)
+    } catch {
+      /* 忽略 */
+    }
+  }
 
   async function requestDirectory(url: string): Promise<DirEntry[]> {
     try {
@@ -1072,27 +1133,10 @@ export function mount(
           const mouse = event as MouseEvent
           // 修饰键 / 中键留给浏览器默认行为（新标签页打开）
           if (mouse.metaKey || mouse.ctrlKey || mouse.shiftKey || mouse.button !== 0) return
-          // 非 Markdown 文件都不跳页：在阅读器里原地预览
-          if ((entry.kind ?? 'md') !== 'md') {
-            event.preventDefault()
-            openPreview(entry)
-            return
-          }
+          // Markdown 与其它类型一样原地切换，都不到整页刷新
           event.preventDefault()
-          const target = (name as HTMLAnchorElement).href
-          const url = new URL(target)
-          // 目标页在 document_start 阶段读这个 hash 铺背景色，避免暗色下白闪
-          url.hash = `mr-theme=${activeTheme}`
-          root.classList.add('is-leaving')
-          root.style.background = activeTheme === 'dark' ? '#0e1116' : '#ffffff'
-          window.setTimeout(() => {
-            location.href = url.href
-          }, 90)
-          // 导航被浏览器拦下时不能让页面停在透明状态
-          window.setTimeout(() => {
-            root.classList.remove('is-leaving')
-            root.style.background = ''
-          }, 1500)
+          if ((entry.kind ?? 'md') === 'md') void openMarkdown(entry)
+          else openPreview(entry)
         })
       }
       row.append(name)
@@ -1432,7 +1476,7 @@ export function mount(
   const flushScroll = (): void => {
     if (rawMode || previewUrl) return
     const top = Math.round(host.scrollTop)
-    const key = pageKey()
+    const key = pageKey(docUrl.href)
     void readScrollMap().then((map) => {
       map[key] = { top, at: Date.now() }
       return writeScrollMap(map)
@@ -1451,16 +1495,20 @@ export function mount(
     flushScroll()
   })
 
-  void (async () => {
-    // 带锚点进来时以锚点为准，不被记忆位置覆盖
-    if (location.hash.replace(/^#/, '').trim()) return
-    const saved = (await readScrollMap())[pageKey()]?.top ?? 0
-    if (!saved) return
-    requestAnimationFrame(() => {
-      const max = host.scrollHeight - host.clientHeight
-      host.scrollTop = Math.min(saved, Math.max(0, max))
-    })
-  })()
+  /** 恢复某篇文档上次的滚动位置 */
+  function restoreScroll(href: string): void {
+    void (async () => {
+      const saved = (await readScrollMap())[pageKey(href)]?.top ?? 0
+      if (!saved) return
+      requestAnimationFrame(() => {
+        const max = host.scrollHeight - host.clientHeight
+        host.scrollTop = Math.min(saved, Math.max(0, max))
+      })
+    })()
+  }
+
+  // 带锚点进来时以锚点为准，不被记忆位置覆盖
+  if (!location.hash.replace(/^#/, '').trim()) restoreScroll(docUrl.href)
 
   // 设置由 popup 改动时同步
   chrome.storage.onChanged.addListener((changes, area) => {

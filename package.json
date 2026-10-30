@@ -1,6 +1,6 @@
 {
   "name": "pane-reader",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A privacy-first local document reader extension for Chrome/Edge",
   "main": "index.js",
   "scripts": {
